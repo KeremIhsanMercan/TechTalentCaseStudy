@@ -35,6 +35,12 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
 
+        //  Services 
+        services.AddScoped<INotificationService, MockNotificationService>();
+
+        //  Background Hosted Services 
+        services.AddHostedService<ReminderSchedulerService>();
+
         //  Polly Resilience Policies 
         // Retry Policy: 3 retries with exponential backoff for transient HTTP errors
         var retryPolicy = HttpPolicyExtensions

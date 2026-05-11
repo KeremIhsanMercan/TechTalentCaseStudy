@@ -34,11 +34,11 @@ public class MockPaymentInfrastructureService : IPaymentInfrastructureService
             "Payment processing initiated. SubscriptionNumber: {SubscriptionNumber}, Amount: {Amount:C}",
             subscriptionNumber, amount);
 
-        // Simulate realistic network latency (100-150ms)
-        var latencyMs = _random.Next(100, 150);
+        // Simulate realistic network latency (200-850ms)
+        var latencyMs = _random.Next(200, 850);
         await Task.Delay(latencyMs);
 
-        // Simulate transient failures 5% of the time
+        // Simulate transient failures 15% of the time
         SimulateTransientFailure(subscriptionNumber, amount);
 
         // Payment succeeds after passing resilience checks
@@ -57,16 +57,16 @@ public class MockPaymentInfrastructureService : IPaymentInfrastructureService
     }
 
     /// <summary>
-    /// Simulates transient network failures (HTTP 503 or HttpRequestException) with a 5% probability.
+    /// Simulates transient network failures (HTTP 503 or HttpRequestException) with a 15% probability.
     /// This enables active demonstration of the Polly retry and circuit breaker policies.
     /// </summary>
     private void SimulateTransientFailure(string subscriptionNumber, decimal amount)
     {
         var failureRoll = _random.Next(1, 101); // 1-100
 
-        if (failureRoll <= 5)
+        if (failureRoll <= 15)
         {
-            if (failureRoll <= 2)
+            if (failureRoll <= 5)
             {
                 _logger.LogWarning(
                     "SIMULATED FAULT: HttpRequestException for payment. SubscriptionNumber: {SubscriptionNumber}, Amount: {Amount:C}",

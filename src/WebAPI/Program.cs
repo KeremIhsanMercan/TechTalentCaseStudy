@@ -1,6 +1,7 @@
 using Application;
 using Infrastructure;
 using WebAPI.Middlewares;
+using Application.DTOs.Reminders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,9 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+builder.Services.Configure<ReminderSettings>(
+    builder.Configuration.GetSection("ReminderSettings"));
 
 var app = builder.Build();
 

@@ -15,4 +15,10 @@ public interface IReminderAppService
     /// </summary>
     /// <param name="approachingDaysThreshold">Number of days before due date to trigger a reminder (default: 5).</param>
     Task<List<ReminderNotificationDto>> GetPendingRemindersAsync(int approachingDaysThreshold = 5, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Background job method to fetch pending reminders and dispatch notifications.
+    /// Uses Partial Failure isolation to ensure robust execution.
+    /// </summary>
+    Task ProcessDailyNotificationsAsync(CancellationToken cancellationToken = default);
 }

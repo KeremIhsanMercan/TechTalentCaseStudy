@@ -2,6 +2,7 @@ using Application.DTOs.Reminders;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Polly;
 
 namespace Application.Services;
@@ -16,20 +17,26 @@ public class ReminderAppService : IReminderAppService
     private readonly ISubscriptionRepository _subscriptionRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IDebtCheckingService _debtCheckingService;
+    private readonly INotificationService _notificationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ReminderSettings _reminderSettings;
     private readonly ILogger<ReminderAppService> _logger;
 
     public ReminderAppService(
         ISubscriptionRepository subscriptionRepository,
         IPaymentRepository paymentRepository,
         IDebtCheckingService debtCheckingService,
+        INotificationService notificationService,
         IDateTimeProvider dateTimeProvider,
+        IOptions<ReminderSettings> reminderSettings,
         ILogger<ReminderAppService> logger)
     {
         _subscriptionRepository = subscriptionRepository;
         _paymentRepository = paymentRepository;
         _debtCheckingService = debtCheckingService;
+        _notificationService = notificationService;
         _dateTimeProvider = dateTimeProvider;
+        _reminderSettings = reminderSettings.Value;
         _logger = logger;
     }
 
@@ -112,7 +119,7 @@ public class ReminderAppService : IReminderAppService
                     reminders.Add(reminder);
 
                     _logger.LogInformation(
-                        "Reminder generated. SubscriptionId: {SubscriptionId}, DebtAmount: {Amount:C}, DaysUntilDue: {Days}",
+                        "Reminder generated for UI. SubscriptionId: {SubscriptionId}, DebtAmount: {Amount:C}, DaysUntilDue: {Days}",
                         subscription.Id, debtResult.DebtAmount, (int)Math.Ceiling(daysUntilDue));
                 }
             }
@@ -127,6 +134,37 @@ public class ReminderAppService : IReminderAppService
 
         _logger.LogInformation("Reminder check completed. Total reminders generated: {Count}", reminders.Count);
         return reminders;
+    }
+
+    public async Task ProcessDailyNotificationsAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Starting daily notification processing loop.");
+        
+        // Fetch pending reminders (using configured threshold inside the service itself)
+        var reminders = await GetPendingRemindersAsync(_reminderSettings.NotificationThresholdDays, cancellationToken);
+        
+        int successCount = 0;
+        int failureCount = 0;
+
+        foreach (var reminder in reminders)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
+            try
+            {
+                await _notificationService.SendNotificationAsync(reminder, cancellationToken);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                // Partial Failure Isolation
+                _logger.LogWarning(ex, "Failed to send notification for Subscription {SubscriptionId}. Continuing with next.", reminder.SubscriptionId);
+                failureCount++;
+            }
+        }
+        
+        _logger.LogInformation("Daily notification processing completed. Success: {SuccessCount}, Failures: {FailureCount}", successCount, failureCount);
     }
 
     /// <summary>
