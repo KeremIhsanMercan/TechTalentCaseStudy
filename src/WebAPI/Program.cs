@@ -1,7 +1,4 @@
-using Domain.Interfaces;
-using Infrastructure.Persistence;
-using Infrastructure.Services;
-using Microsoft.EntityFrameworkCore;
+using Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,12 +8,8 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Register IDateTimeProvider
-builder.Services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
-
-// Register EF Core DbContext with SQL Server
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Register all Infrastructure services (DbContext, IDateTimeProvider, HttpClients with Polly)
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
