@@ -1,0 +1,17 @@
+# IDE & Visual Studio / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.dbmdl
+
+# Build Çıktıları (Kritik Alan)
+[Bb]in/
+[Oo]bj/
+*.log
+
+# Mac / OS X
+.DS_Store
+
+# Agents
+AGENT.md
