@@ -1,3 +1,4 @@
+using Application;
 using Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,7 +9,10 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Register all Infrastructure services (DbContext, IDateTimeProvider, HttpClients with Polly)
+// Register Application layer services (validators, application services)
+builder.Services.AddApplication();
+
+// Register Infrastructure layer services (DbContext, IDateTimeProvider, Repositories, HttpClients with Polly)
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();

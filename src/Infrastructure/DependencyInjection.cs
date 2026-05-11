@@ -2,6 +2,7 @@ using Application.Interfaces;
 using Domain.Interfaces;
 using Infrastructure.ExternalServices;
 using Infrastructure.Persistence;
+using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,16 +21,21 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // ─── Time Abstraction ───────────────────────────────────────────
+        //  Time Abstraction 
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
-        // ─── EF Core DbContext ──────────────────────────────────────────
+        //  EF Core DbContext 
         services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions => sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
-        // ─── Polly Resilience Policies ──────────────────────────────────
+        //  Repositories 
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+
+        //  Polly Resilience Policies 
         // Retry Policy: 3 retries with exponential backoff for transient HTTP errors
         var retryPolicy = HttpPolicyExtensions
             .HandleTransientHttpError() // HttpRequestException, HTTP 5xx, HTTP 408
@@ -46,7 +52,7 @@ public static class DependencyInjection
                         outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString());
                 });
 
-        // ─── Typed HTTP Client: Debt Checking Service ───────────────────
+        //  Typed HTTP Client: Debt Checking Service 
         services.AddHttpClient<IDebtCheckingService, MockDebtCheckingService>(client =>
             {
                 client.BaseAddress = new Uri("https://mock-debt-api.example.com/");
@@ -58,7 +64,7 @@ public static class DependencyInjection
                 .HandleTransientHttpError()
                 .CircuitBreakerAsync(4, TimeSpan.FromSeconds(30))); // Specific Circuit Breaker for Debt Checking Service
 
-        // ─── Typed HTTP Client: Payment Infrastructure Service ──────────
+        //  Typed HTTP Client: Payment Infrastructure Service 
         services.AddHttpClient<IPaymentInfrastructureService, MockPaymentInfrastructureService>(client =>
             {
                 client.BaseAddress = new Uri("https://mock-payment-api.example.com/");
