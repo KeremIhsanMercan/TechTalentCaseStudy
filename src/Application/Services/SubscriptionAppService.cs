@@ -17,6 +17,7 @@ public class SubscriptionAppService : ISubscriptionAppService
     private readonly ICustomerRepository _customerRepository;
     private readonly IValidator<CreateSubscriptionDto> _createValidator;
     private readonly IValidator<UpdateSubscriptionDto> _updateValidator;
+    private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<SubscriptionAppService> _logger;
 
     public SubscriptionAppService(
@@ -24,12 +25,14 @@ public class SubscriptionAppService : ISubscriptionAppService
         ICustomerRepository customerRepository,
         IValidator<CreateSubscriptionDto> createValidator,
         IValidator<UpdateSubscriptionDto> updateValidator,
+        IDateTimeProvider dateTimeProvider,
         ILogger<SubscriptionAppService> logger)
     {
         _subscriptionRepository = subscriptionRepository;
         _customerRepository = customerRepository;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _dateTimeProvider = dateTimeProvider;
         _logger = logger;
     }
 
@@ -68,13 +71,20 @@ public class SubscriptionAppService : ISubscriptionAppService
         if (!await _customerRepository.ExistsAsync(dto.CustomerId, cancellationToken))
             throw new CustomerNotFoundException(dto.CustomerId);
 
+        var now = _dateTimeProvider.UtcNow;
+        var random = new Random();
+        var initialDebt = GenerateInitialDebtAmount(dto.SubscriptionType.ToString(), random);
+        var nextDueDate = now.AddDays(random.Next(2, 26));
+
         var subscription = new Subscription
         {
             CustomerId = dto.CustomerId,
             SubscriptionType = dto.SubscriptionType,
             ServiceProviderName = dto.ServiceProviderName,
             SubscriptionNumber = dto.SubscriptionNumber,
-            IsActive = true // New subscriptions are active by default
+            IsActive = true, // New subscriptions are active by default
+            CurrentDebtAmount = initialDebt,
+            NextDueDate = nextDueDate
         };
 
         await _subscriptionRepository.AddAsync(subscription, cancellationToken);
@@ -140,7 +150,34 @@ public class SubscriptionAppService : ISubscriptionAppService
             ServiceProviderName = subscription.ServiceProviderName,
             SubscriptionNumber = subscription.SubscriptionNumber,
             IsActive = subscription.IsActive,
+            CurrentDebtAmount = subscription.CurrentDebtAmount,
+            NextDueDate = subscription.NextDueDate,
             CreatedDate = subscription.CreatedDate
         };
+    }
+
+    /// <summary>
+    /// Generates a realistic initial debt amount based on subscription type.
+    /// </summary>
+    private static decimal GenerateInitialDebtAmount(string subscriptionType, Random random)
+    {
+        var (min, max) = subscriptionType?.ToUpper(new System.Globalization.CultureInfo("tr-TR")) switch
+        {
+            "ELEKTRİK"    => (150.00m, 850.00m),
+            "SU"          => (50.00m, 300.00m),
+            "DOĞALGAZ"    => (100.00m, 600.00m),
+            "İNTERNET"    => (150.00m, 500.00m),
+            "CEPTELEFONU" => (80.00m, 350.00m),
+            "TELEVİZYON"  => (50.00m, 200.00m),
+            "SİGORTA"     => (200.00m, 1500.00m),
+            "KREDİKARTI"  => (500.00m, 5000.00m),
+            "KİRA"        => (2000.00m, 15000.00m),
+            "AİDAT"       => (100.00m, 1000.00m),
+            _             => (50.00m, 500.00m)
+        };
+
+        var range = max - min;
+        var randomFactor = (decimal)random.NextDouble();
+        return Math.Round(min + range * randomFactor, 2);
     }
 }

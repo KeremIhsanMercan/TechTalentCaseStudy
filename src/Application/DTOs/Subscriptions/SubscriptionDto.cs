@@ -15,5 +15,7 @@ public class SubscriptionDto
     public string ServiceProviderName { get; set; } = string.Empty;
     public string SubscriptionNumber { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public decimal CurrentDebtAmount { get; set; }
+    public DateTime NextDueDate { get; set; }
     public DateTime CreatedDate { get; set; }
 }

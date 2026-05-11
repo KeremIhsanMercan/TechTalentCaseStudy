@@ -30,12 +30,11 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred.");
-            await HandleExceptionAsync(context, ex);
+            await HandleExceptionAsync(context, ex, _logger);
         }
     }
 
-    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static async Task HandleExceptionAsync(HttpContext context, Exception exception, ILogger logger)
     {
         // Avoid writing to a response that has already started because they are read only afterwards.
         if (context.Response.HasStarted)
@@ -52,11 +51,13 @@ public class ExceptionHandlingMiddleware
             case CustomerNotFoundException or SubscriptionNotFoundException:
                 statusCode = HttpStatusCode.NotFound;
                 message = exception.Message;
+                logger.LogWarning("Resource not found: {Message}", message);
                 break;
                 
             case DuplicatePaymentException:
                 statusCode = HttpStatusCode.Conflict;
                 message = exception.Message;
+                logger.LogWarning("Business Rule Block: {Message}", message);
                 break;
                 
             case ValidationException validationException:
@@ -67,10 +68,12 @@ public class ExceptionHandlingMiddleware
                     Field = e.PropertyName,
                     Error = e.ErrorMessage
                 });
+                logger.LogWarning("Input validation failed for request.");
                 break;
                 
             default:
-                // For generic exceptions, keep the generic 500 error message to avoid leaking sensitive information
+                // Unexpected critical exceptions
+                logger.LogError(exception, "An unhandled critical exception occurred.");
                 break;
         }
 

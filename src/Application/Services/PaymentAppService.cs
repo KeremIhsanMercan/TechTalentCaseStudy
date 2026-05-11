@@ -4,6 +4,7 @@ using Domain.Entities;
 using Domain.Exceptions;
 using Domain.Interfaces;
 using Microsoft.Extensions.Logging;
+using Polly;
 
 namespace Application.Services;
 
@@ -67,8 +68,17 @@ public class PaymentAppService : IPaymentAppService
 
         try
         {
-            externalResult = await _paymentInfrastructureService.ProcessPaymentAsync(
-                subscription.SubscriptionNumber, amount);
+            // Resilience Shield: Retry up to 3 times on network/infrastructure failure
+            externalResult = await Policy
+                .Handle<Exception>() // Handle any infrastructure or network error
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromMilliseconds(100 * retryAttempt))
+                .ExecuteAsync(async () =>
+                {
+                    // Actual external service call is made inside the shield
+                    return await _paymentInfrastructureService.ProcessPaymentAsync(
+                        subscription.SubscriptionNumber, amount);
+                });
+
             isSuccessful = externalResult.IsSuccessful;
         }
         catch (Exception ex)

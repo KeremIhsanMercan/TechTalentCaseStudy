@@ -31,6 +31,13 @@ public class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(s => s.CurrentDebtAmount)
+            .HasColumnType("decimal(18,2)")
+            .IsRequired();
+
+        builder.Property(s => s.NextDueDate)
+            .IsRequired();
+
         builder.Property(s => s.CreatedDate)
             .IsRequired();
 

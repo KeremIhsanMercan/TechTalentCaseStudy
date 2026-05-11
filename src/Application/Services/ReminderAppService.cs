@@ -2,6 +2,7 @@ using Application.DTOs.Reminders;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Microsoft.Extensions.Logging;
+using Polly;
 
 namespace Application.Services;
 
@@ -50,7 +51,7 @@ public class ReminderAppService : IReminderAppService
         {
             try
             {
-                // 2. Check if a successful payment exists for current period → SKIP if PAID
+                // 2. Check if a successful payment exists for current period, SKIP if PAID
                 var isPaid = await _paymentRepository.ExistsSuccessfulPaymentAsync(
                     subscription.Id, currentPeriod, cancellationToken);
 
@@ -63,9 +64,18 @@ public class ReminderAppService : IReminderAppService
                 }
 
                 // 3. Call external debt checking service for unpaid subscriptions
-                var debtResult = await _debtCheckingService.CheckDebtAsync(
-                    subscription.SubscriptionNumber,
-                    subscription.SubscriptionType.ToString());
+                var debtResult = await Policy
+                    .Handle<Exception>() // Any C# error
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromMilliseconds(100 * retryAttempt)) // 3 times, with increasing intervals
+                    .ExecuteAsync(async () => 
+                    {
+                        // Actual call is made inside the shield
+                        return await _debtCheckingService.CheckDebtAsync(
+                            subscription.SubscriptionNumber,
+                            subscription.SubscriptionType.ToString(),
+                            subscription.CurrentDebtAmount,
+                            subscription.NextDueDate);
+                    });
 
                 // 4. Check if due date is approaching within threshold
                 var daysUntilDue = (debtResult.DueDate - now).TotalDays;
@@ -126,10 +136,10 @@ public class ReminderAppService : IReminderAppService
         string customerName, string subscriptionType, string providerName,
         decimal debtAmount, DateTime dueDate, int daysUntilDue)
     {
-        return $"Dear {customerName}, " +
-               $"your {subscriptionType} subscription with {providerName} " +
-               $"has an outstanding balance of {debtAmount:F2} TL. " + // Made it Turkish Lira fixed.
-               $"The payment is due on {dueDate:dd/MM/yyyy} ({daysUntilDue} day(s) remaining). " +
-               $"Please make your payment to avoid service interruption.";
+        return $"Sayın {customerName}, " +
+               $"{providerName} {subscriptionType} aboneliğinizin borcu bulunmaktadır. " +
+               $"Borç tutarı {debtAmount:F2} TL'dir. " + 
+               $"Ödeme tarihi {dueDate:dd/MM/yyyy} ({daysUntilDue} gün kaldı). " +
+               $"Ödemenizi yaparak hizmet kesintisini önleyebilirsiniz.";
     }
 }

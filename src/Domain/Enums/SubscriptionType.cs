@@ -5,12 +5,15 @@ namespace Domain.Enums;
 /// </summary>
 public enum SubscriptionType
 {
-    Electricity = 1,
-    Water = 2,
-    NaturalGas = 3,
-    Internet = 4,
-    Mobile = 5,
-    Television = 6,
-    Insurance = 7,
-    Other = 99
+    Elektrik = 1,
+    Su = 2,
+    Doğalgaz = 3,
+    İnternet = 4,
+    CepTelefonu = 5,
+    Televizyon = 6,
+    Sigorta = 7,
+    KrediKartı = 8,
+    Kira = 9,
+    Aidat = 10,
+    Diğer = 99
 }

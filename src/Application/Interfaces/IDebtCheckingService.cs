@@ -13,6 +13,8 @@ public interface IDebtCheckingService
     /// </summary>
     /// <param name="subscriptionNumber">The unique subscription identifier at the service provider.</param>
     /// <param name="subscriptionType">The type of subscription (e.g., "Electricity", "Water").</param>
+    /// <param name="currentDebtAmount">The persistent current debt amount from the database.</param>
+    /// <param name="nextDueDate">The persistent due date from the database.</param>
     /// <returns>Debt query result containing amount, due date, and billing period.</returns>
-    Task<DebtQueryResultDto> CheckDebtAsync(string subscriptionNumber, string subscriptionType);
+    Task<DebtQueryResultDto> CheckDebtAsync(string subscriptionNumber, string subscriptionType, decimal currentDebtAmount, DateTime nextDueDate);
 }
