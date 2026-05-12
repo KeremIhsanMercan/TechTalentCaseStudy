@@ -5,6 +5,7 @@ import { FeedbackAlert } from '../components/FeedbackAlert';
 import { useTableSorting } from '../hooks/useTableSorting';
 import { Pagination } from '../components/Pagination';
 import { SortableHeader } from '../components/SortableHeader';
+import SearchableSelect from '../components/SearchableSelect';
 
 const subscriptionTypes = ['Elektrik', 'Su', 'Doğalgaz', 'İnternet', 'CepTelefonu', 'Televizyon', 'Sigorta', 'KrediKartı', 'Kira', 'Aidat', 'Diğer'];
 
@@ -243,13 +244,18 @@ const Subscriptions = () => {
 
               {!isEditMode && (
                 <div>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>Müşteri</label>
-                  <select required value={formData.customerId} onChange={e => setFormData({ ...formData, customerId: e.target.value })} style={{ width: '100%', padding: '8px' }}>
-                    <option value="">Bir müşteri seçin...</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName} ({c.identityNumber})</option>
-                    ))}
-                  </select>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 500, fontSize: '0.9rem' }}>Müşteri</label>
+                  <SearchableSelect
+                    required
+                    placeholder="Bir müşteri seçin veya arayın..."
+                    options={customers.map(c => ({
+                      value: c.id,
+                      label: `${c.firstName} ${c.lastName}`,
+                      subLabel: c.identityNumber
+                    }))}
+                    value={formData.customerId}
+                    onChange={val => setFormData({ ...formData, customerId: val })}
+                  />
                 </div>
               )}
 
@@ -268,7 +274,7 @@ const Subscriptions = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Abonelik No (Örn: Abone Numarası)</label>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Abonelik No (Örn: Müşteri Numarası)</label>
                 <input required value={formData.subscriptionNumber} onChange={e => setFormData({ ...formData, subscriptionNumber: e.target.value })} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
               </div>
 
