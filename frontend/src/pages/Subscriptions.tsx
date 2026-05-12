@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import apiClient from '../services/apiClient';
 import type { SubscriptionDto, CustomerDto, PaymentHistoryDto } from '../types';
 import { FeedbackAlert } from '../components/FeedbackAlert';
+import { useTableSorting } from '../hooks/useTableSorting';
+import { Pagination } from '../components/Pagination';
+import { SortableHeader } from '../components/SortableHeader';
 
 const subscriptionTypes = ['Elektrik', 'Su', 'Doğalgaz', 'İnternet', 'CepTelefonu', 'Televizyon', 'Sigorta', 'KrediKartı', 'Kira', 'Aidat', 'Diğer'];
 
@@ -63,6 +66,30 @@ const Subscriptions = () => {
     }
   };
 
+  const getCustomerName = (id: string) => {
+    const c = customers.find(x => x.id === id);
+    return c ? `${c.firstName} ${c.lastName}` : 'Bilinmeyen Müşteri';
+  };
+
+  const mappedSubscriptions = useMemo(() => {
+    return subscriptions.map(s => ({
+      ...s,
+      customerName: getCustomerName(s.customerId)
+    }));
+  }, [subscriptions, customers]);
+
+  const {
+    paginatedData,
+    currentPage,
+    pageSize,
+    totalPages,
+    sortConfig,
+    handleSort,
+    handlePageChange,
+    handlePageSizeChange,
+    totalItems
+  } = useTableSorting(mappedSubscriptions, 'nextDueDate', 'asc');
+
   const openCreateModal = () => {
     setIsEditMode(false);
     setFormData({ id: '', customerId: '', subscriptionType: 'Elektrik', serviceProviderName: '', subscriptionNumber: '', isActive: true });
@@ -118,11 +145,6 @@ const Subscriptions = () => {
     }
   };
 
-  const getCustomerName = (id: string) => {
-    const c = customers.find(x => x.id === id);
-    return c ? `${c.firstName} ${c.lastName}` : 'Bilinmeyen Müşteri';
-  };
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -145,20 +167,20 @@ const Subscriptions = () => {
           <table className="fintech-table">
             <thead>
               <tr>
-                <th>Müşteri</th>
-                <th>Tip</th>
-                <th>Kurum</th>
+                <SortableHeader label="Müşteri" sortKey="customerName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+                <SortableHeader label="Tip" sortKey="subscriptionType" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+                <SortableHeader label="Kurum" sortKey="serviceProviderName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
                 <th>Abonelik No</th>
-                <th>Güncel Borç</th>
-                <th>Son Ödeme Tarihi</th>
+                <SortableHeader label="Güncel Borç" sortKey="currentDebtAmount" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+                <SortableHeader label="Son Ödeme Tarihi" sortKey="nextDueDate" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
                 <th>Durum</th>
                 <th>İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {subscriptions.map(s => (
+              {paginatedData.map(s => (
                 <tr key={s.id}>
-                  <td>{getCustomerName(s.customerId)}</td>
+                  <td>{s.customerName}</td>
                   <td>{s.subscriptionType}</td>
                   <td>{s.serviceProviderName}</td>
                   <td>{s.subscriptionNumber}</td>
@@ -193,13 +215,22 @@ const Subscriptions = () => {
                   </td>
                 </tr>
               ))}
-              {subscriptions.length === 0 && (
+              {paginatedData.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Hiç abonelik bulunamadı.</td>
                 </tr>
               )}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[5, 10, 20, 50]}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       )}
 

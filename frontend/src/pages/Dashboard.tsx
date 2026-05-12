@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
 import type { ReminderNotificationDto, SubscriptionDto } from '../types';
 import { FeedbackAlert } from '../components/FeedbackAlert';
+import { useTableSorting } from '../hooks/useTableSorting';
+import { Pagination } from '../components/Pagination';
+import { SortableHeader } from '../components/SortableHeader';
 
 const Dashboard = () => {
   const [reminders, setReminders] = useState<ReminderNotificationDto[]>([]);
@@ -35,13 +38,24 @@ const Dashboard = () => {
     fetchDashboardData(true);
   }, []);
 
+  const {
+    paginatedData,
+    currentPage,
+    pageSize,
+    totalPages,
+    sortConfig,
+    handleSort,
+    handlePageChange,
+    handlePageSizeChange,
+    totalItems
+  } = useTableSorting(reminders, 'daysUntilDue', 'asc', 8);
+
   const handlePayNow = async (reminder: ReminderNotificationDto) => {
     setProcessingId(reminder.subscriptionId);
     setError(null);
     setSuccess(null);
 
     try {
-      // ZERO MANUAL ENTRY: Send the exact amount dynamically from the reminder
       const response = await apiClient.post('/payments/process', {
         subscriptionId: reminder.subscriptionId,
         amount: reminder.debtAmount
@@ -88,55 +102,90 @@ const Dashboard = () => {
           Bu dönem için tüm abonelikleriniz ödenmiştir. Tebrikler!
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-          {reminders.map(reminder => (
-            <div key={reminder.subscriptionId} style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', overflow: 'hidden', border: '1px solid #eee', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ backgroundColor: '#f8f9fa', padding: '15px 20px', borderBottom: '1px solid #eee' }}>
-                <h4 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>{reminder.serviceProviderName}</h4>
-                <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '0.85rem' }}>{reminder.subscriptionTypeName}</p>
-              </div>
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: '10px',
+            backgroundColor: '#f8f9fa',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            marginBottom: '15px',
+            border: '1px solid #eee',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            color: '#666'
+          }}>
+            <SortableHeader as="div" label="Müşteri" sortKey="customerFullName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+            <SortableHeader as="div" label="Tip" sortKey="subscriptionTypeName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+            <SortableHeader as="div" label="Kurum" sortKey="serviceProviderName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+            <SortableHeader as="div" label="Tutar" sortKey="debtAmount" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+            <SortableHeader as="div" label="Kalan Gün" sortKey="daysUntilDue" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+          </div>
 
-              <div style={{ padding: '20px', flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                  <span style={{ color: '#666' }}>Son Ödeme</span>
-                  <span style={{ fontWeight: '500' }}>{reminder.daysUntilDue} gün kaldı</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+            {paginatedData.map(reminder => (
+              <div key={reminder.subscriptionId} style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', overflow: 'hidden', border: '1px solid #eee', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ backgroundColor: '#f8f9fa', padding: '15px 20px', borderBottom: '1px solid #eee' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <h4 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>{reminder.serviceProviderName}</h4>
+                    <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: '500' }}>{reminder.customerFullName}</span>
+                  </div>
+                  <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '0.85rem' }}>{reminder.subscriptionTypeName}</p>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
-                  <span style={{ color: '#666' }}>Borç Tutarı</span>
-                  <span style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#dc3545' }}>
-                    {reminder.debtAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
-                  </span>
+
+                <div style={{ padding: '20px', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                    <span style={{ color: '#666' }}>Son Ödeme</span>
+                    <span style={{ fontWeight: '500' }}>{reminder.daysUntilDue} gün kaldı</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
+                    <span style={{ color: '#666' }}>Borç Tutarı</span>
+                    <span style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#dc3545' }}>
+                      {reminder.debtAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                    </span>
+                  </div>
+
+                  <p style={{ fontSize: '0.9rem', color: '#856404', backgroundColor: '#fff3cd', padding: '10px', borderRadius: '6px', margin: '0 0 20px 0' }}>
+                    "{reminder.notificationMessage}"
+                  </p>
                 </div>
 
-                <p style={{ fontSize: '0.9rem', color: '#856404', backgroundColor: '#fff3cd', padding: '10px', borderRadius: '6px', margin: '0 0 20px 0' }}>
-                  "{reminder.notificationMessage}"
-                </p>
+                <div style={{ padding: '15px 20px', backgroundColor: '#fdfdfd', borderTop: '1px solid #eee' }}>
+                  <button
+                    onClick={() => handlePayNow(reminder)}
+                    disabled={processingId === reminder.subscriptionId}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: processingId === reminder.subscriptionId ? '#6c757d' : '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: processingId === reminder.subscriptionId ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => { if (processingId !== reminder.subscriptionId) e.currentTarget.style.backgroundColor = '#218838'; }}
+                    onMouseOut={(e) => { if (processingId !== reminder.subscriptionId) e.currentTarget.style.backgroundColor = '#28a745'; }}
+                  >
+                    {processingId === reminder.subscriptionId ? 'İşleniyor...' : 'Ödeme Yap'}
+                  </button>
+                </div>
               </div>
+            ))}
+          </div>
 
-              <div style={{ padding: '15px 20px', backgroundColor: '#fdfdfd', borderTop: '1px solid #eee' }}>
-                <button
-                  onClick={() => handlePayNow(reminder)}
-                  disabled={processingId === reminder.subscriptionId}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: processingId === reminder.subscriptionId ? '#6c757d' : '#28a745',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: processingId === reminder.subscriptionId ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => { if (processingId !== reminder.subscriptionId) e.currentTarget.style.backgroundColor = '#218838'; }}
-                  onMouseOut={(e) => { if (processingId !== reminder.subscriptionId) e.currentTarget.style.backgroundColor = '#28a745'; }}
-                >
-                  {processingId === reminder.subscriptionId ? 'İşleniyor...' : 'Ödeme Yap'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[4, 8, 20, 40]}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
     </div>
   );

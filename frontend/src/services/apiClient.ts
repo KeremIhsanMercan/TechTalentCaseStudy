@@ -7,13 +7,11 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 10000,
 });
 
-// Request Interceptor: Currently passes request through, but ready for Auth Tokens if needed.
 apiClient.interceptors.request.use(
   (config) => {
-    // e.g. config.headers.Authorization = `Bearer ${token}`
     return config;
   },
   (error) => {

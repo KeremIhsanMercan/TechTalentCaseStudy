@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
 import type { CustomerDto, ReminderNotificationDto } from '../types';
 import { FeedbackAlert } from '../components/FeedbackAlert';
+import { useTableSorting } from '../hooks/useTableSorting';
+import { Pagination } from '../components/Pagination';
+import { SortableHeader } from '../components/SortableHeader';
 
 const Customers = () => {
   const [customers, setCustomers] = useState<CustomerDto[]>([]);
@@ -39,6 +42,18 @@ const Customers = () => {
       setLoading(false);
     }
   };
+
+  const {
+    paginatedData,
+    currentPage,
+    pageSize,
+    totalPages,
+    sortConfig,
+    handleSort,
+    handlePageChange,
+    handlePageSizeChange,
+    totalItems
+  } = useTableSorting(customers, 'firstName', 'asc');
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Bu müşteriyi silmek istediğinize emin misiniz?')) return;
@@ -107,15 +122,15 @@ const Customers = () => {
         <table className="fintech-table">
           <thead>
             <tr>
-              <th>Ad Soyad</th>
-              <th>TC Kimlik No</th>
-              <th>E-Posta</th>
+              <SortableHeader label="Ad Soyad" sortKey="firstName" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+              <SortableHeader label="TC Kimlik No" sortKey="identityNumber" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
+              <SortableHeader label="E-Posta" sortKey="email" currentSortKey={sortConfig.key as string} currentDirection={sortConfig.direction} onSort={handleSort} />
               <th>Telefon</th>
               <th>İşlemler</th>
             </tr>
           </thead>
           <tbody>
-            {customers.map(c => (
+            {paginatedData.map(c => (
               <tr key={c.id}>
                 <td>{c.firstName} {c.lastName}</td>
                 <td>{c.identityNumber}</td>
@@ -138,13 +153,22 @@ const Customers = () => {
                 </td>
               </tr>
             ))}
-            {customers.length === 0 && (
+            {paginatedData.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Hiç müşteri bulunamadı.</td>
               </tr>
             )}
           </tbody>
         </table>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          pageSizeOptions={[5, 10, 20, 50]}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
         </div>
       )}
 
