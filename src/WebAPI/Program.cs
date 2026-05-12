@@ -1,5 +1,6 @@
 using Application;
 using Infrastructure;
+using Infrastructure.Persistence;
 using WebAPI.Middlewares;
 using Application.DTOs.Reminders;
 
@@ -53,5 +54,15 @@ app.UseCors("StrictCorsPolicy");
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Create the database schema
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await context.Database.EnsureCreatedAsync(); 
+}
+
+// Seed the database with initial data
+await app.SeedDatabaseAsync();
 
 app.Run();

@@ -11,6 +11,7 @@ namespace Application.Services;
 /// Application service for payment reminder logic.
 /// Identifies unpaid active subscriptions approaching their due dates
 /// and generates notification DTOs (simulating Email/SMS).
+/// Optimized with Task.WhenAll concurrency and pre-allocated Polly policies.
 /// </summary>
 public class ReminderAppService : IReminderAppService
 {
@@ -43,19 +44,22 @@ public class ReminderAppService : IReminderAppService
     public async Task<List<ReminderNotificationDto>> GetPendingRemindersAsync(
         int approachingDaysThreshold = 5, CancellationToken cancellationToken = default)
     {
-        var reminders = new List<ReminderNotificationDto>();
         var now = _dateTimeProvider.UtcNow;
         var currentPeriod = $"{now.Year}_{now.Month:D2}";
 
         _logger.LogInformation(
-            "Checking pending reminders. Period: {Period}, Threshold: {Threshold} days",
+            "Checking pending reminders concurrently. Period: {Period}, Threshold: {Threshold} days",
             currentPeriod, approachingDaysThreshold);
 
         // 1. Fetch all active subscriptions (with Customer navigation)
         var activeSubscriptions = await _subscriptionRepository.GetActiveSubscriptionsAsync(cancellationToken);
 
+        // PHASE 1: Sequential Database Filtering (Thread-Safe with Partial Failure Isolation)
+        var unpaidSubscriptions = new List<Domain.Entities.Subscription>();
         foreach (var subscription in activeSubscriptions)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 // 2. Check if a successful payment exists for current period, SKIP if PAID
@@ -70,25 +74,40 @@ public class ReminderAppService : IReminderAppService
                     continue;
                 }
 
-                // 3. Call external debt checking service for unpaid subscriptions
-                var debtResult = await Policy
-                    .Handle<Exception>() // Any C# error
-                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromMilliseconds(100 * retryAttempt)) // 3 times, with increasing intervals
-                    .ExecuteAsync(async () => 
-                    {
-                        // Actual call is made inside the shield
-                        return await _debtCheckingService.CheckDebtAsync(
-                            subscription.SubscriptionNumber,
-                            subscription.SubscriptionType.ToString(),
-                            subscription.CurrentDebtAmount,
-                            subscription.NextDueDate);
-                    });
+                unpaidSubscriptions.Add(subscription);
+            }
+            catch (Exception ex)
+            {
+                // A single failed database query should not stop the entire reminder process.
+                _logger.LogWarning(ex, "Failed to check payment status for Subscription {SubscriptionId}. Skipping.", subscription.Id);
+            }
+        }
+
+        // Polly Policy object is allocated once outside the loop/lambda to optimize memory usage.
+        var retryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromMilliseconds(100 * retryAttempt));
+
+        // PHASE 2: Concurrent Network Requests (High-Performance I/O)
+        var reminderTasks = unpaidSubscriptions.Select(async subscription =>
+        {
+            try
+            {
+                // 3. Call external debt checking service using the shared pre-allocated policy
+                var debtResult = await retryPolicy.ExecuteAsync(async () => 
+                {
+                    return await _debtCheckingService.CheckDebtAsync(
+                        subscription.SubscriptionNumber,
+                        subscription.SubscriptionType.ToString(),
+                        subscription.CurrentDebtAmount,
+                        subscription.NextDueDate);
+                });
 
                 // 4. Check if due date is approaching within threshold
                 var daysUntilDue = (debtResult.DueDate - now).TotalDays;
 
-                // Only process if due date is today (0) or in the future
-                if (daysUntilDue >= 0 && daysUntilDue <= approachingDaysThreshold)
+                // Only process if due date is today (0) or in the future and debt amount is greater than 0
+                if (daysUntilDue >= 0 && daysUntilDue <= approachingDaysThreshold && debtResult.DebtAmount > 0)
                 {
                     var reminder = new ReminderNotificationDto
                     {
@@ -116,12 +135,14 @@ public class ReminderAppService : IReminderAppService
                             (int)Math.Ceiling(daysUntilDue))
                     };
 
-                    reminders.Add(reminder);
-
                     _logger.LogInformation(
                         "Reminder generated for UI. SubscriptionId: {SubscriptionId}, DebtAmount: {Amount:C}, DaysUntilDue: {Days}",
-                        subscription.Id, debtResult.DebtAmount, (int)Math.Ceiling(daysUntilDue));
+                        subscription.Id, debtResult.DebtAmount, reminder.DaysUntilDue);
+
+                    return reminder;
                 }
+
+                return null;
             }
             catch (Exception ex)
             {
@@ -129,10 +150,20 @@ public class ReminderAppService : IReminderAppService
                 _logger.LogWarning(ex,
                     "Failed to check debt for Subscription {SubscriptionId}. Skipping reminder.",
                     subscription.Id);
+                return null;
             }
-        }
+        });
 
-        _logger.LogInformation("Reminder check completed. Total reminders generated: {Count}", reminders.Count);
+        // Execute all tasks concurrently
+        var reminderResults = await Task.WhenAll(reminderTasks);
+        
+        // Aggregate valid results cleanly
+        var reminders = reminderResults
+            .Where(r => r != null)
+            .Cast<ReminderNotificationDto>()
+            .ToList();
+
+        _logger.LogInformation("Concurrent reminder check completed. Total reminders generated: {Count}", reminders.Count);
         return reminders;
     }
 
