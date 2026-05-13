@@ -51,6 +51,24 @@ npm install
 npm run dev
 ```
 
+## 🧪 Testler
+
+Uygulamanın iş mantığı, özellikle karmaşık eşzamanlılık (concurrency) ve dirençlilik (resilience) senaryoları içeren katmanlar için birim testler ile güvence altına alınmıştır.
+
+### Testleri Çalıştırmak İçin:
+Terminalinizden test dizinine gidin ve testleri başlatın:
+```bash
+cd tests/Application.UnitTests
+dotnet test
+```
+
+### Test Kapsamı:
+* **ReminderAppService Testleri:**
+    * Ödeme vadesi yaklaşan abonelikler için hatırlatma oluşturulma mantığı.
+    * Ödemesi yapılmış aboneliklerin filtrelenmesi.
+    * Eşik değer (threshold) dışındaki borçların göz ardı edilmesi.
+    * **Kısmi Hata Yalıtımı (Partial Failure Isolation):** Bir dış servis sorgusu başarısız olduğunda diğer hatırlatmaların kesintiye uğramadan devam etmesinin doğrulanması.
+
 ## 📐 Sistem Tasarım Dokümanları
 
 Uygulamanın kurumsal mimari standartlara, veri bütünlüğü ilkelerine ve denetim (audit) süreçlerine tam uyumluluğunu kanıtlamak adına, sistemin tüm katmanları ve entegrasyon noktaları uçtan uca dokümante edilmiştir:
